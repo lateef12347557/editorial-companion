@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, FileText, PenSquare, BarChart3, LogOut, Menu, Clock, CheckCircle, XCircle, Eye
+  LayoutDashboard, FileText, PenSquare, BarChart3, LogOut, Menu, Clock, CheckCircle, XCircle, Eye, Edit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { writerStats, articles } from '@/data/mockData';
+import { writerStats, articles as mockArticles, type Article } from '@/data/mockData';
+import ArticleCompose from '@/components/editor/ArticleCompose';
+import '@/components/editor/editor.css';
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: 'Overview', id: 'overview' },
@@ -18,6 +20,8 @@ const sidebarLinks = [
 const WriterDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [myArticles, setMyArticles] = useState<Article[]>(mockArticles.slice(0, 4));
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
   const statusIcon = (status: string) => {
     switch (status) {
@@ -26,6 +30,32 @@ const WriterDashboard = () => {
       case 'rejected': return <XCircle className="h-4 w-4 text-destructive" />;
       default: return <FileText className="h-4 w-4 text-muted-foreground" />;
     }
+  };
+
+  const handleSaveArticle = (articleData: Partial<Article>) => {
+    const existing = myArticles.find((a) => a.id === articleData.id);
+    if (existing) {
+      setMyArticles((prev) => prev.map((a) => (a.id === articleData.id ? { ...a, ...articleData } as Article : a)));
+    } else {
+      setMyArticles((prev) => [articleData as Article, ...prev]);
+    }
+    setEditingArticle(null);
+    setActiveTab('articles');
+  };
+
+  const handleEditArticle = (article: Article) => {
+    setEditingArticle(article);
+    setActiveTab('new');
+  };
+
+  const handleNewPost = () => {
+    setEditingArticle(null);
+    setActiveTab('new');
+  };
+
+  const currentTabLabel = () => {
+    if (activeTab === 'new') return editingArticle ? 'Edit Post' : 'New Post';
+    return activeTab;
   };
 
   return (
@@ -42,7 +72,11 @@ const WriterDashboard = () => {
           {sidebarLinks.map((link) => (
             <button
               key={link.id}
-              onClick={() => { setActiveTab(link.id); setSidebarOpen(false); }}
+              onClick={() => {
+                if (link.id === 'new') handleNewPost();
+                else setActiveTab(link.id);
+                setSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm transition-colors ${
                 activeTab === link.id
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -69,12 +103,13 @@ const WriterDashboard = () => {
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
-            <h1 className="font-serif text-lg font-semibold capitalize">{activeTab === 'new' ? 'New Post' : activeTab}</h1>
+            <h1 className="font-serif text-lg font-semibold capitalize">{currentTabLabel()}</h1>
           </div>
           <Badge variant="outline" className="text-xs">Writer</Badge>
         </header>
 
         <main className="p-4 sm:p-6">
+          {/* Overview */}
           {activeTab === 'overview' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -94,9 +129,14 @@ const WriterDashboard = () => {
                 ))}
               </div>
 
-              <h2 className="font-serif text-lg font-semibold mb-4">My Recent Articles</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-serif text-lg font-semibold">My Recent Articles</h2>
+                <Button variant="outline" size="sm" onClick={handleNewPost}>
+                  <PenSquare className="h-4 w-4 mr-2" /> New Post
+                </Button>
+              </div>
               <div className="space-y-3">
-                {articles.slice(0, 4).map((article) => (
+                {myArticles.slice(0, 4).map((article) => (
                   <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
                     {statusIcon(article.status)}
                     <div className="flex-1 min-w-0">
@@ -104,24 +144,83 @@ const WriterDashboard = () => {
                       <p className="text-xs text-muted-foreground mt-0.5">{article.category} · {article.readTime}</p>
                     </div>
                     <Badge variant="secondary" className="text-xs capitalize flex-shrink-0">{article.status}</Badge>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
             </motion.div>
           )}
 
-          {activeTab !== 'overview' && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
-                <PenSquare className="h-6 w-6 text-muted-foreground" />
+          {/* My Articles */}
+          {activeTab === 'articles' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-sm text-muted-foreground">{myArticles.length} articles total</p>
+                <Button variant="outline" size="sm" onClick={handleNewPost}>
+                  <PenSquare className="h-4 w-4 mr-2" /> New Post
+                </Button>
               </div>
-              <h2 className="font-serif text-xl font-semibold mb-2">
-                {activeTab === 'new' ? 'Create New Post' : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
-              </h2>
-              <p className="text-muted-foreground text-sm max-w-md">
-                Connect Lovable Cloud to enable the rich-text editor, image uploads, and article submission workflow.
-              </p>
-            </div>
+              <div className="space-y-3">
+                {myArticles.map((article) => (
+                  <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
+                    {article.coverImage && (
+                      <img src={article.coverImage} alt="" className="w-16 h-12 object-cover rounded-sm flex-shrink-0 hidden sm:block" />
+                    )}
+                    {statusIcon(article.status)}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">{article.title}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {article.category} · {article.readTime} · {article.publishedAt}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={article.status === 'published' ? 'default' : article.status === 'rejected' ? 'destructive' : 'secondary'}
+                      className="text-xs capitalize flex-shrink-0"
+                    >
+                      {article.status}
+                    </Badge>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* New / Edit Post */}
+          {activeTab === 'new' && (
+            <ArticleCompose
+              article={editingArticle}
+              onBack={() => setActiveTab(editingArticle ? 'articles' : 'overview')}
+              onSave={handleSaveArticle}
+            />
+          )}
+
+          {/* Stats */}
+          {activeTab === 'stats' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                {[
+                  { label: 'Total Articles', value: writerStats.totalArticles },
+                  { label: 'Published', value: writerStats.published },
+                  { label: 'Drafts', value: writerStats.drafts },
+                  { label: 'Pending Review', value: writerStats.pending },
+                  { label: 'Rejected', value: writerStats.rejected },
+                  { label: 'Total Views', value: writerStats.totalViews.toLocaleString() },
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-card border border-border rounded-sm p-5">
+                    <span className="text-sm text-muted-foreground block mb-1">{stat.label}</span>
+                    <span className="font-serif text-2xl font-bold">{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-card border border-border rounded-sm p-6 text-center text-muted-foreground">
+                <p className="text-sm">Detailed analytics charts will be available when connected to Lovable Cloud.</p>
+              </div>
+            </motion.div>
           )}
         </main>
       </div>
