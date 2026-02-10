@@ -1,19 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user, signIn, signUp } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) navigate('/');
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: isLogin ? 'Sign in' : 'Sign up',
-      description: 'Authentication requires Lovable Cloud. Connect it to enable login.',
-    });
+    setSubmitting(true);
+
+    if (isLogin) {
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Welcome back!' });
+      }
+    } else {
+      const { error } = await signUp(email, password, displayName);
+      if (error) {
+        toast({ title: 'Sign up failed', description: error.message, variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Account created!',
+          description: 'Please check your email to verify your account before signing in.',
+        });
+      }
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -42,19 +71,19 @@ const Auth = () => {
             {!isLogin && (
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Full Name</label>
-                <Input required placeholder="Your name" />
+                <Input required placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
               </div>
             )}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Email</label>
-              <Input required type="email" placeholder="you@example.com" />
+              <Input required type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Password</label>
-              <Input required type="password" placeholder="••••••••" />
+              <Input required type="password" placeholder="••••••••" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
-              {isLogin ? 'Sign In' : 'Create Account'}
+            <Button type="submit" disabled={submitting} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
+              {submitting ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
 

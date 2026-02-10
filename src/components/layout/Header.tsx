@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Search, LogOut, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -15,6 +16,15 @@ const navLinks = [
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, isWriter, displayName, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const dashboardLink = isAdmin ? '/admin' : isWriter ? '/writer' : null;
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -24,9 +34,23 @@ const Header = () => {
           <span className="hidden sm:block">Independent Journalism · Trusted Voices</span>
           <span className="sm:hidden text-xs">UPEBSA Editorial</span>
           <div className="flex items-center gap-3">
-            <Link to="/auth" className="hover:text-foreground transition-colors">
-              Sign In
-            </Link>
+            {user ? (
+              <>
+                <span className="text-xs hidden sm:block">{displayName || user.email}</span>
+                {dashboardLink && (
+                  <Link to={dashboardLink} className="hover:text-foreground transition-colors flex items-center gap-1">
+                    <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
+                  </Link>
+                )}
+                <button onClick={handleSignOut} className="hover:text-foreground transition-colors flex items-center gap-1">
+                  <LogOut className="h-3.5 w-3.5" /> Sign Out
+                </button>
+              </>
+            ) : (
+              <Link to="/auth" className="hover:text-foreground transition-colors">
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -99,13 +123,22 @@ const Header = () => {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                to="/auth"
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-3 text-sm font-medium text-accent hover:text-accent/80 transition-colors"
-              >
-                Sign In
-              </Link>
+              {user ? (
+                <>
+                  {dashboardLink && (
+                    <Link to={dashboardLink} onClick={() => setMobileOpen(false)} className="px-4 py-3 text-sm font-medium text-accent">
+                      Dashboard
+                    </Link>
+                  )}
+                  <button onClick={() => { handleSignOut(); setMobileOpen(false); }} className="px-4 py-3 text-sm font-medium text-left text-muted-foreground">
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <Link to="/auth" onClick={() => setMobileOpen(false)} className="px-4 py-3 text-sm font-medium text-accent hover:text-accent/80 transition-colors">
+                  Sign In
+                </Link>
+              )}
             </nav>
           </motion.div>
         )}
