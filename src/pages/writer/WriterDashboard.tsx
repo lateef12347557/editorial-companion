@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, FileText, PenSquare, BarChart3, LogOut, Menu, Clock, CheckCircle, XCircle, Eye, Edit
+  LayoutDashboard, FileText, PenSquare, BarChart3, LogOut, Menu, Clock, CheckCircle, XCircle, Eye, Edit, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { writerStats, articles as mockArticles, type Article } from '@/data/mockData';
+import { useMyArticles, useWriterStats, useDeleteMyArticle } from '@/hooks/useWriterData';
 import ArticleCompose from '@/components/editor/ArticleCompose';
 import '@/components/editor/editor.css';
 
@@ -17,11 +17,25 @@ const sidebarLinks = [
   { icon: BarChart3, label: 'My Stats', id: 'stats' },
 ];
 
+interface EditingArticle {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  category_id: string | null;
+  cover_image_url: string | null;
+  status: string;
+  slug: string;
+}
+
 const WriterDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [myArticles, setMyArticles] = useState<Article[]>(mockArticles.slice(0, 4));
-  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [editingArticle, setEditingArticle] = useState<EditingArticle | null>(null);
+
+  const { data: articles, isLoading } = useMyArticles();
+  const { data: stats } = useWriterStats();
+  const deleteArticle = useDeleteMyArticle();
 
   const statusIcon = (status: string) => {
     switch (status) {
@@ -32,19 +46,17 @@ const WriterDashboard = () => {
     }
   };
 
-  const handleSaveArticle = (articleData: Partial<Article>) => {
-    const existing = myArticles.find((a) => a.id === articleData.id);
-    if (existing) {
-      setMyArticles((prev) => prev.map((a) => (a.id === articleData.id ? { ...a, ...articleData } as Article : a)));
-    } else {
-      setMyArticles((prev) => [articleData as Article, ...prev]);
-    }
-    setEditingArticle(null);
-    setActiveTab('articles');
-  };
-
-  const handleEditArticle = (article: Article) => {
-    setEditingArticle(article);
+  const handleEditArticle = (article: any) => {
+    setEditingArticle({
+      id: article.id,
+      title: article.title,
+      excerpt: article.excerpt,
+      content: article.content,
+      category_id: article.category_id,
+      cover_image_url: article.cover_image_url,
+      status: article.status,
+      slug: article.slug,
+    });
     setActiveTab('new');
   };
 
@@ -53,9 +65,19 @@ const WriterDashboard = () => {
     setActiveTab('new');
   };
 
+  const handleSaved = () => {
+    setEditingArticle(null);
+    setActiveTab('articles');
+  };
+
   const currentTabLabel = () => {
     if (activeTab === 'new') return editingArticle ? 'Edit Post' : 'New Post';
     return activeTab;
+  };
+
+  const statusBadge = (status: string) => {
+    const variant = status === 'published' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
+    return <Badge variant={variant} className="text-xs capitalize flex-shrink-0">{status}</Badge>;
   };
 
   return (
@@ -114,10 +136,10 @@ const WriterDashboard = () => {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
-                  { label: 'Published', value: writerStats.published, icon: Eye },
-                  { label: 'Drafts', value: writerStats.drafts, icon: FileText },
-                  { label: 'Pending', value: writerStats.pending, icon: Clock },
-                  { label: 'Total Views', value: writerStats.totalViews.toLocaleString(), icon: BarChart3 },
+                  { label: 'Published', value: stats?.published ?? '—', icon: Eye },
+                  { label: 'Drafts', value: stats?.drafts ?? '—', icon: FileText },
+                  { label: 'Pending', value: stats?.pending ?? '—', icon: Clock },
+                  { label: 'Total', value: stats?.totalArticles ?? '—', icon: BarChart3 },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-card border border-border rounded-sm p-5">
                     <div className="flex items-center justify-between mb-2">
@@ -135,21 +157,30 @@ const WriterDashboard = () => {
                   <PenSquare className="h-4 w-4 mr-2" /> New Post
                 </Button>
               </div>
-              <div className="space-y-3">
-                {myArticles.slice(0, 4).map((article) => (
-                  <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
-                    {statusIcon(article.status)}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{article.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{article.category} · {article.readTime}</p>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <div className="space-y-3">
+                  {(articles || []).slice(0, 5).map((article) => (
+                    <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
+                      {statusIcon(article.status)}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">{article.title}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {(article.categories as any)?.name || 'No category'} · {article.read_time || '—'}
+                        </p>
+                      </div>
+                      {statusBadge(article.status)}
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Badge variant="secondary" className="text-xs capitalize flex-shrink-0">{article.status}</Badge>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                  {articles?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No articles yet. Create your first post!</p>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -157,36 +188,45 @@ const WriterDashboard = () => {
           {activeTab === 'articles' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
               <div className="flex items-center justify-between mb-6">
-                <p className="text-sm text-muted-foreground">{myArticles.length} articles total</p>
+                <p className="text-sm text-muted-foreground">{articles?.length ?? 0} articles total</p>
                 <Button variant="outline" size="sm" onClick={handleNewPost}>
                   <PenSquare className="h-4 w-4 mr-2" /> New Post
                 </Button>
               </div>
-              <div className="space-y-3">
-                {myArticles.map((article) => (
-                  <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
-                    {article.coverImage && (
-                      <img src={article.coverImage} alt="" className="w-16 h-12 object-cover rounded-sm flex-shrink-0 hidden sm:block" />
-                    )}
-                    {statusIcon(article.status)}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{article.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {article.category} · {article.readTime} · {article.publishedAt}
-                      </p>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <div className="space-y-3">
+                  {(articles || []).map((article) => (
+                    <div key={article.id} className="bg-card border border-border rounded-sm p-4 flex items-center gap-4">
+                      {article.cover_image_url && (
+                        <img src={article.cover_image_url} alt="" className="w-16 h-12 object-cover rounded-sm flex-shrink-0 hidden sm:block" />
+                      )}
+                      {statusIcon(article.status)}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">{article.title}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {(article.categories as any)?.name || 'No category'} · {article.read_time || '—'} · {new Date(article.updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {statusBadge(article.status)}
+                      <div className="flex gap-1">
+                        {(article.status === 'draft' || article.status === 'rejected') && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteArticle.mutate(article.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <Badge
-                      variant={article.status === 'published' ? 'default' : article.status === 'rejected' ? 'destructive' : 'secondary'}
-                      className="text-xs capitalize flex-shrink-0"
-                    >
-                      {article.status}
-                    </Badge>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditArticle(article)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                  {articles?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No articles yet.</p>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -195,30 +235,26 @@ const WriterDashboard = () => {
             <ArticleCompose
               article={editingArticle}
               onBack={() => setActiveTab(editingArticle ? 'articles' : 'overview')}
-              onSave={handleSaveArticle}
+              onSaved={handleSaved}
             />
           )}
 
           {/* Stats */}
           {activeTab === 'stats' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
-                  { label: 'Total Articles', value: writerStats.totalArticles },
-                  { label: 'Published', value: writerStats.published },
-                  { label: 'Drafts', value: writerStats.drafts },
-                  { label: 'Pending Review', value: writerStats.pending },
-                  { label: 'Rejected', value: writerStats.rejected },
-                  { label: 'Total Views', value: writerStats.totalViews.toLocaleString() },
+                  { label: 'Total Articles', value: stats?.totalArticles ?? '—' },
+                  { label: 'Published', value: stats?.published ?? '—' },
+                  { label: 'Drafts', value: stats?.drafts ?? '—' },
+                  { label: 'Pending Review', value: stats?.pending ?? '—' },
+                  { label: 'Rejected', value: stats?.rejected ?? '—' },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-card border border-border rounded-sm p-5">
                     <span className="text-sm text-muted-foreground block mb-1">{stat.label}</span>
                     <span className="font-serif text-2xl font-bold">{stat.value}</span>
                   </div>
                 ))}
-              </div>
-              <div className="bg-card border border-border rounded-sm p-6 text-center text-muted-foreground">
-                <p className="text-sm">Detailed analytics charts will be available when connected to Lovable Cloud.</p>
               </div>
             </motion.div>
           )}
