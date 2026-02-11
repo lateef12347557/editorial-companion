@@ -1,12 +1,19 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, FileText, Users, Image, Tag, BarChart3, LogOut, Menu, X, CheckCircle, XCircle, Eye, EyeOff, Star
+  LayoutDashboard, FileText, Users, Image, Tag, LogOut, Menu,
+  CheckCircle, XCircle, Eye, EyeOff, Star, Trash2, Plus, UserPlus, UserMinus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { adminStats, articles } from '@/data/mockData';
+import { Input } from '@/components/ui/input';
+import {
+  useAdminArticles, useUpdateArticleStatus, useDeleteArticle, useAdminStats,
+  useWriters, useAllProfiles, useManageWriterRole,
+  useCategories, useCreateCategory, useDeleteCategory,
+  useAdminGallery, useToggleGalleryPublish, useDeleteGalleryImage,
+} from '@/hooks/useAdminData';
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: 'Overview', id: 'overview' },
@@ -14,12 +21,35 @@ const sidebarLinks = [
   { icon: Users, label: 'Writers', id: 'writers' },
   { icon: Image, label: 'Gallery', id: 'gallery' },
   { icon: Tag, label: 'Categories', id: 'categories' },
-  { icon: BarChart3, label: 'Analytics', id: 'analytics' },
 ];
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+
+  // Data hooks
+  const { data: stats } = useAdminStats();
+  const { data: articles, isLoading: articlesLoading } = useAdminArticles();
+  const updateArticle = useUpdateArticleStatus();
+  const deleteArticle = useDeleteArticle();
+  const { data: writers } = useWriters();
+  const { data: allProfiles } = useAllProfiles();
+  const manageWriter = useManageWriterRole();
+  const { data: categories } = useCategories();
+  const createCategory = useCreateCategory();
+  const deleteCategory = useDeleteCategory();
+  const { data: galleryImages } = useAdminGallery();
+  const togglePublish = useToggleGalleryPublish();
+  const deleteImage = useDeleteGalleryImage();
+
+  const writerUserIds = new Set(writers?.map((w) => w.user_id) || []);
+  const nonWriterProfiles = allProfiles?.filter((p) => !writerUserIds.has(p.id)) || [];
+
+  const statusBadge = (status: string) => {
+    const variant = status === 'published' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
+    return <Badge variant={variant} className="text-xs capitalize">{status}</Badge>;
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -54,7 +84,6 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      {/* Overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-foreground/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Main */}
@@ -70,16 +99,17 @@ const AdminDashboard = () => {
         </header>
 
         <main className="p-4 sm:p-6">
+          {/* ───── Overview ───── */}
           {activeTab === 'overview' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 {[
-                  { label: 'Total Articles', value: adminStats.totalArticles, icon: FileText },
-                  { label: 'Published', value: adminStats.publishedArticles, icon: Eye },
-                  { label: 'Pending Review', value: adminStats.pendingReview, icon: CheckCircle },
-                  { label: 'Total Writers', value: adminStats.totalWriters, icon: Users },
-                  { label: 'Total Views', value: adminStats.totalViews.toLocaleString(), icon: BarChart3 },
-                  { label: 'This Month', value: adminStats.thisMonthViews.toLocaleString(), icon: Star },
+                  { label: 'Total Articles', value: stats?.totalArticles ?? '—', icon: FileText },
+                  { label: 'Published', value: stats?.publishedArticles ?? '—', icon: Eye },
+                  { label: 'Pending Review', value: stats?.pendingReview ?? '—', icon: CheckCircle },
+                  { label: 'Drafts', value: stats?.drafts ?? '—', icon: FileText },
+                  { label: 'Total Writers', value: stats?.totalWriters ?? '—', icon: Users },
+                  { label: 'Featured', value: stats?.featuredArticles ?? '—', icon: Star },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-card border border-border rounded-sm p-5">
                     <div className="flex items-center justify-between mb-2">
@@ -92,64 +122,244 @@ const AdminDashboard = () => {
               </div>
 
               <h2 className="font-serif text-lg font-semibold mb-4">Recent Articles</h2>
-              <div className="bg-card border border-border rounded-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-secondary">
-                      <tr>
-                        <th className="text-left px-4 py-3 font-medium">Title</th>
-                        <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Author</th>
-                        <th className="text-left px-4 py-3 font-medium">Status</th>
-                        <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Category</th>
-                        <th className="text-right px-4 py-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {articles.map((article) => (
-                        <tr key={article.id} className="hover:bg-muted/50 transition-colors">
-                          <td className="px-4 py-3 font-medium max-w-xs truncate">{article.title}</td>
-                          <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{article.author}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant={article.status === 'published' ? 'default' : 'secondary'} className="text-xs capitalize">
-                              {article.status}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{article.category}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7"><CheckCircle className="h-3.5 w-3.5" /></Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7"><XCircle className="h-3.5 w-3.5" /></Button>
-                              {article.featured ? (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-accent"><EyeOff className="h-3.5 w-3.5" /></Button>
-                              ) : (
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><Star className="h-3.5 w-3.5" /></Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {articlesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <ArticlesTable
+                  articles={(articles || []).slice(0, 10)}
+                  statusBadge={statusBadge}
+                  onUpdate={updateArticle.mutate}
+                  onDelete={deleteArticle.mutate}
+                />
+              )}
+            </motion.div>
+          )}
+
+          {/* ───── Articles ───── */}
+          {activeTab === 'articles' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <p className="text-sm text-muted-foreground mb-4">{articles?.length ?? 0} articles total</p>
+              {articlesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <ArticlesTable
+                  articles={articles || []}
+                  statusBadge={statusBadge}
+                  onUpdate={updateArticle.mutate}
+                  onDelete={deleteArticle.mutate}
+                />
+              )}
+            </motion.div>
+          )}
+
+          {/* ───── Writers ───── */}
+          {activeTab === 'writers' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <h2 className="font-serif text-lg font-semibold mb-4">Current Writers</h2>
+              <div className="space-y-2 mb-8">
+                {writers?.length === 0 && <p className="text-sm text-muted-foreground">No writers yet.</p>}
+                {writers?.map((w) => (
+                  <div key={w.user_id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{(w.profiles as any)?.display_name || 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">Since {new Date(w.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => manageWriter.mutate({ userId: w.user_id, action: 'remove' })}
+                    >
+                      <UserMinus className="h-4 w-4 mr-1" /> Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <h2 className="font-serif text-lg font-semibold mb-4">Add Writer</h2>
+              <div className="space-y-2">
+                {nonWriterProfiles.length === 0 && <p className="text-sm text-muted-foreground">All users already have roles or no users available.</p>}
+                {nonWriterProfiles.map((p) => (
+                  <div key={p.id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
+                    <p className="font-medium text-sm">{p.display_name || 'Unnamed'}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => manageWriter.mutate({ userId: p.id, action: 'add' })}
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" /> Make Writer
+                    </Button>
+                  </div>
+                ))}
               </div>
             </motion.div>
           )}
 
-          {activeTab !== 'overview' && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
-                <FileText className="h-6 w-6 text-muted-foreground" />
+          {/* ───── Gallery ───── */}
+          {activeTab === 'gallery' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <p className="text-sm text-muted-foreground mb-4">{galleryImages?.length ?? 0} images</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {galleryImages?.map((img) => (
+                  <div key={img.id} className="bg-card border border-border rounded-sm overflow-hidden">
+                    <div className="aspect-square">
+                      <img src={img.image_url} alt={img.title} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-medium truncate">{img.title}</p>
+                      <p className="text-xs text-muted-foreground">{img.album || 'No album'}</p>
+                      <div className="flex gap-1 mt-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => togglePublish.mutate({ id: img.id, is_published: !img.is_published })}
+                        >
+                          {img.is_published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => deleteImage.mutate(img.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {galleryImages?.length === 0 && <p className="text-sm text-muted-foreground col-span-full">No gallery images yet.</p>}
               </div>
-              <h2 className="font-serif text-xl font-semibold mb-2 capitalize">{activeTab} Management</h2>
-              <p className="text-muted-foreground text-sm max-w-md">
-                Connect Lovable Cloud to enable full {activeTab} management with database storage, authentication, and real-time updates.
-              </p>
-            </div>
+            </motion.div>
+          )}
+
+          {/* ───── Categories ───── */}
+          {activeTab === 'categories' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <div className="flex gap-2 mb-6">
+                <Input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New category name…"
+                  className="max-w-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newCategory.trim()) {
+                      createCategory.mutate({ name: newCategory.trim() });
+                      setNewCategory('');
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (newCategory.trim()) {
+                      createCategory.mutate({ name: newCategory.trim() });
+                      setNewCategory('');
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {categories?.map((cat) => (
+                  <div key={cat.id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{cat.name}</p>
+                      <p className="text-xs text-muted-foreground">/{cat.slug}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => deleteCategory.mutate(cat.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                {categories?.length === 0 && <p className="text-sm text-muted-foreground">No categories yet.</p>}
+              </div>
+            </motion.div>
           )}
         </main>
       </div>
     </div>
   );
 };
+
+/* ───── Articles Table Sub-component ───── */
+
+function ArticlesTable({
+  articles,
+  statusBadge,
+  onUpdate,
+  onDelete,
+}: {
+  articles: any[];
+  statusBadge: (s: string) => React.ReactNode;
+  onUpdate: (args: { id: string; status?: string; featured?: boolean }) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium">Title</th>
+              <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Author</th>
+              <th className="text-left px-4 py-3 font-medium">Status</th>
+              <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Category</th>
+              <th className="text-right px-4 py-3 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {articles.map((article) => (
+              <tr key={article.id} className="hover:bg-muted/50 transition-colors">
+                <td className="px-4 py-3 font-medium max-w-xs truncate">{article.title}</td>
+                <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                  {(article.profiles as any)?.display_name || '—'}
+                </td>
+                <td className="px-4 py-3">{statusBadge(article.status)}</td>
+                <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                  {(article.categories as any)?.name || '—'}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex justify-end gap-1">
+                    {article.status !== 'published' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Publish"
+                        onClick={() => onUpdate({ id: article.id, status: 'published' })}>
+                        <CheckCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {article.status === 'pending' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Reject"
+                        onClick={() => onUpdate({ id: article.id, status: 'rejected' })}>
+                        <XCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title={article.featured ? 'Unfeature' : 'Feature'}
+                      onClick={() => onUpdate({ id: article.id, featured: !article.featured })}>
+                      {article.featured ? <EyeOff className="h-3.5 w-3.5 text-accent" /> : <Star className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete"
+                      onClick={() => onDelete(article.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {articles.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No articles found.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default AdminDashboard;
