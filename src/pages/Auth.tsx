@@ -13,12 +13,16 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user, signIn, signUp } = useAuth();
+  const { user, isAdmin, isWriter, signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) navigate('/');
-  }, [user, navigate]);
+    if (user) {
+      if (isAdmin) navigate('/admin');
+      else if (isWriter) navigate('/writer');
+      else navigate('/');
+    }
+  }, [user, isAdmin, isWriter, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

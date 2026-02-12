@@ -3,15 +3,19 @@ import { Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import ArticleCard from '@/components/articles/ArticleCard';
-import { articles, categories } from '@/data/mockData';
+import { usePublishedArticles, usePublicCategories } from '@/hooks/usePublicData';
 
 const Articles = () => {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const { data: articles = [], isLoading } = usePublishedArticles();
+  const { data: categories = [] } = usePublicCategories();
 
   const filtered = articles.filter((a) => {
-    const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.excerpt.toLowerCase().includes(search.toLowerCase());
-    const matchCat = activeCategory === 'All' || a.category === activeCategory;
+    const matchSearch =
+      a.title.toLowerCase().includes(search.toLowerCase()) ||
+      (a.excerpt || '').toLowerCase().includes(search.toLowerCase());
+    const matchCat = activeCategory === 'All' || a.category_name === activeCategory;
     return matchSearch && matchCat;
   });
 
@@ -28,19 +32,13 @@ const Articles = () => {
       </section>
 
       <section className="editorial-container py-8">
-        {/* Search + Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search articles..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+            <Input placeholder="Search articles..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {['All', ...categories].map((cat) => (
+            {['All', ...categories.map((c) => c.name)].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -56,8 +54,9 @@ const Articles = () => {
           </div>
         </div>
 
-        {/* Results */}
-        {filtered.length > 0 ? (
+        {isLoading ? (
+          <p className="text-center py-20 text-muted-foreground">Loading articles...</p>
+        ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
             {filtered.map((article) => (
               <ArticleCard key={article.id} article={article} />

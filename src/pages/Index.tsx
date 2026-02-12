@@ -3,23 +3,20 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ArticleCard from '@/components/articles/ArticleCard';
-import { articles } from '@/data/mockData';
-
-const featuredArticles = articles.filter((a) => a.featured);
-const latestArticles = articles.filter((a) => !a.featured).slice(0, 3);
+import { usePublishedArticles } from '@/hooks/usePublicData';
 
 const Index = () => {
+  const { data: articles = [], isLoading } = usePublishedArticles();
+
+  const featuredArticles = articles.filter((a) => a.featured);
+  const latestArticles = articles.filter((a) => !a.featured).slice(0, 3);
+
   return (
     <>
       {/* Hero */}
       <section className="bg-primary text-primary-foreground">
         <div className="editorial-container py-16 sm:py-20">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="max-w-3xl"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="max-w-3xl">
             <div className="editorial-divider-accent mb-6" />
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.1] mb-4 text-balance">
               Independent Journalism.<br />Rigorous Scholarship.
@@ -46,15 +43,19 @@ const Index = () => {
             <div className="editorial-divider-accent mb-3" />
             <h2 className="font-serif text-2xl sm:text-3xl font-bold">Featured Stories</h2>
           </div>
-          <Link to="/articles" className="text-sm text-accent font-medium hover:underline hidden sm:block">
-            View all →
-          </Link>
+          <Link to="/articles" className="text-sm text-accent font-medium hover:underline hidden sm:block">View all →</Link>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {featuredArticles.slice(0, 2).map((article) => (
-            <ArticleCard key={article.id} article={article} variant="featured" />
-          ))}
-        </div>
+        {isLoading ? (
+          <p className="text-muted-foreground">Loading...</p>
+        ) : featuredArticles.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {featuredArticles.slice(0, 2).map((article) => (
+              <ArticleCard key={article.id} article={article} variant="featured" />
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground">No featured stories yet.</p>
+        )}
       </section>
 
       {/* Latest + Sidebar */}
@@ -63,11 +64,17 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <h2 className="font-serif text-xl font-bold mb-6">Latest Articles</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {latestArticles.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-            </div>
+            {isLoading ? (
+              <p className="text-muted-foreground">Loading...</p>
+            ) : latestArticles.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {latestArticles.map((article) => (
+                  <ArticleCard key={article.id} article={article} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No articles yet.</p>
+            )}
           </div>
           <aside>
             <h2 className="font-serif text-xl font-bold mb-6">Trending</h2>
