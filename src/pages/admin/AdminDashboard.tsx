@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, FileText, Users, Image, Tag, LogOut, Menu,
-  CheckCircle, XCircle, Eye, EyeOff, Star, Trash2, Plus, UserPlus, UserMinus,
+  CheckCircle, XCircle, Eye, EyeOff, Star, Trash2, Plus, UserPlus, UserMinus, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,10 +13,12 @@ import {
   useWriters, useAllProfiles, useManageWriterRole,
   useCategories, useCreateCategory, useDeleteCategory,
   useAdminGallery, useToggleGalleryPublish, useDeleteGalleryImage,
+  usePendingApprovals, useApproveUser,
 } from '@/hooks/useAdminData';
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: 'Overview', id: 'overview' },
+  { icon: ShieldCheck, label: 'Approvals', id: 'approvals' },
   { icon: FileText, label: 'Articles', id: 'articles' },
   { icon: Users, label: 'Writers', id: 'writers' },
   { icon: Image, label: 'Gallery', id: 'gallery' },
@@ -42,6 +44,8 @@ const AdminDashboard = () => {
   const { data: galleryImages } = useAdminGallery();
   const togglePublish = useToggleGalleryPublish();
   const deleteImage = useDeleteGalleryImage();
+  const { data: pendingApprovals } = usePendingApprovals();
+  const approveUser = useApproveUser();
 
   const writerUserIds = new Set(writers?.map((w) => w.user_id) || []);
   const nonWriterProfiles = allProfiles?.filter((p) => !writerUserIds.has(p.id)) || [];
@@ -109,6 +113,7 @@ const AdminDashboard = () => {
                   { label: 'Pending Review', value: stats?.pendingReview ?? '—', icon: CheckCircle },
                   { label: 'Drafts', value: stats?.drafts ?? '—', icon: FileText },
                   { label: 'Total Writers', value: stats?.totalWriters ?? '—', icon: Users },
+                  { label: 'Pending Approvals', value: pendingApprovals?.length ?? '—', icon: ShieldCheck },
                   { label: 'Featured', value: stats?.featuredArticles ?? '—', icon: Star },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-card border border-border rounded-sm p-5">
@@ -135,7 +140,48 @@ const AdminDashboard = () => {
             </motion.div>
           )}
 
-          {/* ───── Articles ───── */}
+          {/* ───── Approvals ───── */}
+          {activeTab === 'approvals' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <h2 className="font-serif text-lg font-semibold mb-4">Pending Account Approvals</h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                New users need your approval before they can access the writer dashboard.
+              </p>
+              <div className="space-y-2">
+                {pendingApprovals?.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No pending approvals.</p>
+                )}
+                {pendingApprovals?.map((profile) => (
+                  <div key={profile.id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{profile.display_name || 'Unnamed'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Signed up {new Date(profile.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-accent text-accent-foreground hover:bg-accent/90"
+                        onClick={() => approveUser.mutate({ userId: profile.id, approve: true })}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => approveUser.mutate({ userId: profile.id, approve: false })}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" /> Deny
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'articles' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
               <p className="text-sm text-muted-foreground mb-4">{articles?.length ?? 0} articles total</p>
