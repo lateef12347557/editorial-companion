@@ -101,10 +101,43 @@ export function useAllProfiles() {
   return useQuery({
     queryKey: ['admin-all-profiles'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('id, display_name, avatar_url');
+      const { data, error } = await supabase.from('profiles').select('id, display_name, avatar_url, is_approved');
       if (error) throw error;
       return data;
     },
+  });
+}
+
+export function usePendingApprovals() {
+  return useQuery({
+    queryKey: ['admin-pending-approvals'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url, created_at, is_approved')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useApproveUser() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ userId, approve }: { userId: string; approve: boolean }) => {
+      const { error } = await supabase.from('profiles').update({ is_approved: approve }).eq('id', userId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { approve }) => {
+      qc.invalidateQueries({ queryKey: ['admin-pending-approvals'] });
+      qc.invalidateQueries({ queryKey: ['admin-all-profiles'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+      toast({ title: approve ? 'User approved' : 'User approval revoked' });
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 }
 

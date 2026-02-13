@@ -11,6 +11,7 @@ interface AuthContextType {
   roles: AppRole[];
   isAdmin: boolean;
   isWriter: boolean;
+  isApproved: boolean;
   displayName: string | null;
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
 
   const fetchRoles = async (userId: string) => {
     const { data } = await supabase
@@ -43,10 +45,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name')
+      .select('display_name, is_approved')
       .eq('id', userId)
       .maybeSingle();
     setDisplayName(data?.display_name || null);
+    setIsApproved(data?.is_approved ?? false);
   };
 
   useEffect(() => {
@@ -62,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setRoles([]);
         setDisplayName(null);
+        setIsApproved(false);
       }
       setLoading(false);
     });
@@ -109,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         roles,
         isAdmin: roles.includes('admin'),
         isWriter: roles.includes('writer'),
+        isApproved,
         displayName,
         signUp,
         signIn,
