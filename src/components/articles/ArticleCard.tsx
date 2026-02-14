@@ -1,16 +1,25 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
 import type { PublicArticle } from '@/hooks/usePublicData';
 
 interface ArticleCardProps {
   article: PublicArticle;
   variant?: 'default' | 'featured' | 'compact';
+  showNewBadge?: boolean;
 }
 
 const placeholder = 'https://images.unsplash.com/photo-1504711434969-e33886168d6c?w=600&q=80';
 
-const ArticleCard = ({ article, variant = 'default' }: ArticleCardProps) => {
+function isRecentlyPublished(publishedAt: string | null): boolean {
+  if (!publishedAt) return false;
+  const diff = Date.now() - new Date(publishedAt).getTime();
+  return diff < 7 * 24 * 60 * 60 * 1000; // 7 days
+}
+
+const ArticleCard = ({ article, variant = 'default', showNewBadge = false }: ArticleCardProps) => {
   const img = article.cover_image_url || placeholder;
+  const isNew = showNewBadge || isRecentlyPublished(article.published_at);
 
   if (variant === 'featured') {
     return (
@@ -19,6 +28,11 @@ const ArticleCard = ({ article, variant = 'default' }: ArticleCardProps) => {
           <div className="relative aspect-[16/9] overflow-hidden rounded-sm mb-4">
             <img src={img} alt={article.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
             <div className="absolute inset-0" style={{ background: 'var(--overlay-gradient)' }} />
+            {isNew && (
+              <Badge className="absolute top-3 right-3 bg-accent text-accent-foreground text-[10px] font-semibold">
+                New
+              </Badge>
+            )}
             <div className="absolute bottom-0 left-0 right-0 p-6">
               <span className="inline-block text-xs font-semibold uppercase tracking-wider text-accent mb-2">{article.category_name}</span>
               <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary-foreground leading-tight mb-2">{article.title}</h2>
@@ -48,8 +62,13 @@ const ArticleCard = ({ article, variant = 'default' }: ArticleCardProps) => {
   return (
     <motion.article initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="group">
       <Link to={`/article/${article.slug}`} className="block">
-        <div className="aspect-[3/2] overflow-hidden rounded-sm mb-3">
+        <div className="relative aspect-[3/2] overflow-hidden rounded-sm mb-3">
           <img src={img} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+          {isNew && (
+            <Badge className="absolute top-2 right-2 bg-accent text-accent-foreground text-[10px] font-semibold">
+              New
+            </Badge>
+          )}
         </div>
         <span className="text-xs font-semibold uppercase tracking-wider text-accent">{article.category_name}</span>
         <h3 className="font-serif text-lg font-semibold leading-snug mt-1 mb-2 group-hover:text-accent transition-colors">{article.title}</h3>
