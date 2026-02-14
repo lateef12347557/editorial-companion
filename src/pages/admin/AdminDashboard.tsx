@@ -12,9 +12,10 @@ import {
   useAdminArticles, useUpdateArticleStatus, useDeleteArticle, useAdminStats,
   useWriters, useAllProfiles, useManageWriterRole,
   useCategories, useCreateCategory, useDeleteCategory,
-  useAdminGallery, useToggleGalleryPublish, useDeleteGalleryImage,
+  useAdminGallery, useToggleGalleryPublish, useDeleteGalleryImage, useUploadGalleryImage,
   usePendingApprovals, useApproveUser,
 } from '@/hooks/useAdminData';
+import { useAuth } from '@/contexts/AuthContext';
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: 'Overview', id: 'overview' },
@@ -29,6 +30,12 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [articleFilter, setArticleFilter] = useState<'all' | 'pending'>('all');
+  const [galleryTitle, setGalleryTitle] = useState('');
+  const [galleryAlbum, setGalleryAlbum] = useState('');
+  const [galleryDesc, setGalleryDesc] = useState('');
+  const [galleryFile, setGalleryFile] = useState<File | null>(null);
+  const { user } = useAuth();
 
   // Data hooks
   const { data: stats } = useAdminStats();
@@ -44,6 +51,7 @@ const AdminDashboard = () => {
   const { data: galleryImages } = useAdminGallery();
   const togglePublish = useToggleGalleryPublish();
   const deleteImage = useDeleteGalleryImage();
+  const uploadImage = useUploadGalleryImage();
   const { data: pendingApprovals } = usePendingApprovals();
   const approveUser = useApproveUser();
 
@@ -184,12 +192,25 @@ const AdminDashboard = () => {
 
           {activeTab === 'articles' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-              <p className="text-sm text-muted-foreground mb-4">{articles?.length ?? 0} articles total</p>
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={() => setArticleFilter('all')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors ${articleFilter === 'all' ? 'bg-accent text-accent-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                >
+                  All ({articles?.length ?? 0})
+                </button>
+                <button
+                  onClick={() => setArticleFilter('pending')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors ${articleFilter === 'pending' ? 'bg-accent text-accent-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+                >
+                  Pending ({articles?.filter(a => a.status === 'pending').length ?? 0})
+                </button>
+              </div>
               {articlesLoading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : (
                 <ArticlesTable
-                  articles={articles || []}
+                  articles={(articleFilter === 'pending' ? (articles || []).filter(a => a.status === 'pending') : articles || [])}
                   statusBadge={statusBadge}
                   onUpdate={updateArticle.mutate}
                   onDelete={deleteArticle.mutate}
@@ -244,6 +265,37 @@ const AdminDashboard = () => {
           {/* ───── Gallery ───── */}
           {activeTab === 'gallery' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              {/* Upload Form */}
+              <div className="bg-card border border-border rounded-sm p-5 mb-6">
+                <h3 className="font-serif text-base font-semibold mb-3">Upload Image</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <Input placeholder="Title *" value={galleryTitle} onChange={e => setGalleryTitle(e.target.value)} />
+                  <Input placeholder="Album (optional)" value={galleryAlbum} onChange={e => setGalleryAlbum(e.target.value)} />
+                </div>
+                <Input placeholder="Description (optional)" value={galleryDesc} onChange={e => setGalleryDesc(e.target.value)} className="mb-3" />
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setGalleryFile(e.target.files?.[0] || null)}
+                    className="text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80"
+                  />
+                  <Button
+                    disabled={!galleryFile || !galleryTitle.trim() || uploadImage.isPending}
+                    onClick={() => {
+                      if (galleryFile && galleryTitle.trim() && user) {
+                        uploadImage.mutate(
+                          { file: galleryFile, title: galleryTitle.trim(), album: galleryAlbum.trim(), description: galleryDesc.trim(), uploaderId: user.id },
+                          { onSuccess: () => { setGalleryTitle(''); setGalleryAlbum(''); setGalleryDesc(''); setGalleryFile(null); } }
+                        );
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> {uploadImage.isPending ? 'Uploading…' : 'Upload'}
+                  </Button>
+                </div>
+              </div>
+
               <p className="text-sm text-muted-foreground mb-4">{galleryImages?.length ?? 0} images</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {galleryImages?.map((img) => (
@@ -254,12 +306,16 @@ const AdminDashboard = () => {
                     <div className="p-3">
                       <p className="text-sm font-medium truncate">{img.title}</p>
                       <p className="text-xs text-muted-foreground">{img.album || 'No album'}</p>
+                      <Badge variant={img.is_published ? 'default' : 'secondary'} className="text-[10px] mt-1">
+                        {img.is_published ? 'Published' : 'Draft'}
+                      </Badge>
                       <div className="flex gap-1 mt-2">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => togglePublish.mutate({ id: img.id, is_published: !img.is_published })}
+                          title={img.is_published ? 'Unpublish' : 'Publish'}
                         >
                           {img.is_published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                         </Button>
@@ -268,6 +324,7 @@ const AdminDashboard = () => {
                           size="icon"
                           className="h-7 w-7 text-destructive"
                           onClick={() => deleteImage.mutate(img.id)}
+                          title="Delete"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

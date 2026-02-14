@@ -256,3 +256,29 @@ export function useDeleteGalleryImage() {
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 }
+
+export function useUploadGalleryImage() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async ({ file, title, album, description, uploaderId }: {
+      file: File; title: string; album?: string; description?: string; uploaderId: string;
+    }) => {
+      const ext = file.name.split('.').pop();
+      const path = `gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('uploads').upload(path, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
+      const { error } = await supabase.from('gallery_images').insert({
+        image_url: publicUrl, title, album: album || null, description: description || null,
+        uploader_id: uploaderId, is_published: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-gallery'] });
+      toast({ title: 'Image uploaded' });
+    },
+    onError: (err: Error) => toast({ title: 'Upload failed', description: err.message, variant: 'destructive' }),
+  });
+}
