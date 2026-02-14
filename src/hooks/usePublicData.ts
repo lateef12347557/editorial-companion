@@ -88,3 +88,39 @@ export function usePublishedGallery() {
     },
   });
 }
+
+export function useRecentlyApprovedArticles() {
+  return useQuery({
+    queryKey: ['recently-approved-articles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('id, title, slug, excerpt, cover_image_url, featured, published_at, read_time, categories:category_id(name), author_id')
+        .eq('status', 'published')
+        .not('published_at', 'is', null)
+        .order('published_at', { ascending: false })
+        .limit(8);
+      if (error) throw error;
+
+      const authorIds = [...new Set((data || []).map((a) => a.author_id))];
+      const { data: profiles } = authorIds.length
+        ? await supabase.from('profiles').select('id, display_name').in('id', authorIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p.display_name]));
+
+      return (data || []).map((a) => ({
+        id: a.id,
+        title: a.title,
+        slug: a.slug,
+        excerpt: a.excerpt,
+        content: null,
+        cover_image_url: a.cover_image_url,
+        featured: a.featured,
+        published_at: a.published_at,
+        read_time: a.read_time,
+        category_name: (a.categories as any)?.name || null,
+        author_name: profileMap.get(a.author_id) || 'Unknown',
+      })) as PublicArticle[];
+    },
+  });
+}

@@ -16,6 +16,7 @@ import {
   usePendingApprovals, useApproveUser,
 } from '@/hooks/useAdminData';
 import { useAuth } from '@/contexts/AuthContext';
+import PendingArticlesPanel from '@/components/admin/PendingArticlesPanel';
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: 'Overview', id: 'overview' },
@@ -151,41 +152,47 @@ const AdminDashboard = () => {
           {/* ───── Approvals ───── */}
           {activeTab === 'approvals' && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-              <h2 className="font-serif text-lg font-semibold mb-4">Pending Account Approvals</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                New users need your approval before they can access the writer dashboard.
-              </p>
-              <div className="space-y-2">
-                {pendingApprovals?.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No pending approvals.</p>
-                )}
-                {pendingApprovals?.map((profile) => (
-                  <div key={profile.id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{profile.display_name || 'Unnamed'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Signed up {new Date(profile.created_at).toLocaleDateString()}
-                      </p>
+              {/* Pending Articles */}
+              <PendingArticlesPanel />
+
+              {/* Pending Account Approvals */}
+              <div className="mt-10">
+                <h2 className="font-serif text-lg font-semibold mb-4">Pending Account Approvals</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  New users need your approval before they can access the writer dashboard.
+                </p>
+                <div className="space-y-2">
+                  {pendingApprovals?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No pending approvals.</p>
+                  )}
+                  {pendingApprovals?.map((profile) => (
+                    <div key={profile.id} className="bg-card border border-border rounded-sm p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{profile.display_name || 'Unnamed'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Signed up {new Date(profile.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-accent text-accent-foreground hover:bg-accent/90"
+                          onClick={() => approveUser.mutate({ userId: profile.id, approve: true })}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => approveUser.mutate({ userId: profile.id, approve: false })}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" /> Deny
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-accent text-accent-foreground hover:bg-accent/90"
-                        onClick={() => approveUser.mutate({ userId: profile.id, approve: true })}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => approveUser.mutate({ userId: profile.id, approve: false })}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" /> Deny
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}

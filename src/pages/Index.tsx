@@ -1,15 +1,24 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ArticleCard from '@/components/articles/ArticleCard';
-import { usePublishedArticles } from '@/hooks/usePublicData';
+import { usePublishedArticles, useRecentlyApprovedArticles } from '@/hooks/usePublicData';
+import { useRef } from 'react';
 
 const Index = () => {
   const { data: articles = [], isLoading } = usePublishedArticles();
+  const { data: recentlyApproved = [] } = useRecentlyApprovedArticles();
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const featuredArticles = articles.filter((a) => a.featured);
   const latestArticles = articles.filter((a) => !a.featured).slice(0, 3);
+
+  const scrollCarousel = (dir: 'left' | 'right') => {
+    if (!carouselRef.current) return;
+    const amount = carouselRef.current.clientWidth * 0.7;
+    carouselRef.current.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
 
   return (
     <>
@@ -57,6 +66,37 @@ const Index = () => {
           <p className="text-muted-foreground">No featured stories yet.</p>
         )}
       </section>
+
+      {/* Recently Approved */}
+      {recentlyApproved.length > 0 && (
+        <section className="editorial-container py-12 sm:py-16">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <div className="editorial-divider-accent mb-3" />
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold">Recently Approved</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => scrollCarousel('left')}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => scrollCarousel('right')}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div
+            ref={carouselRef}
+            className="flex gap-6 overflow-x-auto scroll-smooth pb-4 snap-x snap-mandatory"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {recentlyApproved.map((article) => (
+              <div key={article.id} className="min-w-[280px] sm:min-w-[320px] max-w-[340px] flex-shrink-0 snap-start">
+                <ArticleCard article={article} showNewBadge />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Latest + Sidebar */}
       <section className="editorial-container pb-16">
